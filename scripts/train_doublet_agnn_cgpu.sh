@@ -11,7 +11,7 @@
 #SBATCH -A m1759
 
 # Setup
-config=configs/agnn_big.yaml
+config=configs/agnn_small.yaml
 mkdir -p logs
 . scripts/setup_cgpu.sh
 

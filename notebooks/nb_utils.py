@@ -118,7 +118,7 @@ def compute_metrics(preds, targets, threshold=0.5):
                    prc_precision=prc_precision, prc_recall=prc_recall, prc_thresh=prc_thresh,
                    roc_fpr=roc_fpr, roc_tpr=roc_tpr, roc_thresh=roc_thresh, roc_auc=roc_auc)
 
-def plot_train_history(summaries, figsize=(12, 5), loss_yscale='linear'):
+def plot_train_history(summaries, figsize=(12, 5), loss_yscale='linear', acc_yscale='linear'):
     fig, (ax0, ax1) = plt.subplots(ncols=2, figsize=figsize)
 
     # Plot losses
@@ -133,7 +133,8 @@ def plot_train_history(summaries, figsize=(12, 5), loss_yscale='linear'):
     ax1.plot(summaries.epoch, summaries.valid_acc, label='Validation')
     ax1.set_xlabel('Epoch')
     ax1.set_ylabel('Accuracy')
-    ax1.set_ylim(bottom=0, top=1)
+#     ax1.set_ylim(bottom=0, top=1)
+    ax1.set_yscale(acc_yscale)
     ax1.legend(loc=0)
 
     plt.tight_layout()
@@ -223,7 +224,7 @@ def draw_sample(X, Ri, Ro, y, cmap='bwr_r', alpha_labels=True, figsize=(15, 7)):
     ax1.set_ylabel('$r$')
     plt.tight_layout()
 
-    
+
 def draw_sample_xy(hits, edges, preds, labels, cut=0.5, figsize=(16, 16)):
     x = hits[:,0] * np.cos(hits[:,1])
     y = hits[:,0] * np.sin(hits[:,1])
@@ -284,4 +285,309 @@ def draw_triplets_xy(hits, edges, preds, labels, cut=0.5, figsize=(16, 16)):
                      [yi[edges[0,j]], yo[edges[0,j]]],
                      '-', c='k', alpha=preds[j])
 
+    return fig, ax0
+
+def draw_triplets_xy_antiscore(hits, edges, preds, labels, doublet=None, cut=0.5, figsize=(16, 16)):
+    xi, yi = [hits[:,0] * np.cos(hits[:,1]), hits[:,0] * np.sin(hits[:,1])]
+    xo, yo = [hits[:,3] * np.cos(hits[:,4]), hits[:,3] * np.sin(hits[:,4])]
+    scores = hits[:,6]
+    fig, ax0 = plt.subplots(figsize=figsize)
+
+#     Draw the hits
+    ax0.scatter(xi, yi, s=2, c='k')
+
+    # Draw the segments
+    #for j in range(labels.shape[0]):
+    if doublet is None:
+        for j in range(len(labels)):
+
+            # False negatives
+            if preds[j] < cut and labels[j] > cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '--', c='b', alpha=(1-scores[edges[0,j]]))
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '--', c='b', alpha=(1-scores[edges[1,j]]))
+
+            # False positives
+            if preds[j] > cut and labels[j] < cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '-', c='r', alpha=preds[j])
+            if preds[j] > cut and labels[j] < cut:
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '-', c='r', alpha=preds[j])
+
+            # True positives
+            if preds[j] > cut and labels[j] > cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '-', c='k', alpha=(1-scores[edges[0,j]]))
+            if preds[j] > cut and labels[j] > cut:
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '-', c='k', alpha=(1-scores[edges[1,j]]))
+
+    return fig, ax0
+
+def draw_triplets_xy_antiscore_cut_edges(hits, edges, preds, labels, doublet=None, cut=0.5, figsize=(16, 16)):
+    xi, yi = [hits[:,0] * np.cos(hits[:,1]), hits[:,0] * np.sin(hits[:,1])]
+    xo, yo = [hits[:,3] * np.cos(hits[:,4]), hits[:,3] * np.sin(hits[:,4])]
+    scores = hits[:,6]
+    fig, ax0 = plt.subplots(figsize=figsize)
+
+#     Draw the hits
+    ax0.scatter(xi, yi, s=2, c='k')
+
+    # Draw the segments
+    #for j in range(labels.shape[0]):
+    if doublet is None:
+        for j in range(len(labels)):
+
+            # False negatives that doublet identifyer would have correctly identified
+            if preds[j] < cut and labels[j] > cut and scores[edges[0,j]] > cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '--', c='r')
+            if preds[j] < cut and labels[j] > cut and scores[edges[1,j]] > cut:
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '--', c='r')
+                
+            # True negatives that doublet identifyer would have incorrectly identified
+            if preds[j] < cut and labels[j] < cut and scores[edges[0,j]] > cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '--', c='k')
+            if preds[j] < cut and labels[j] < cut and scores[edges[1,j]] > cut:
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '--', c='k')
+
+            # False positives that doublet identifyer would have correctly identified
+            if preds[j] > cut and labels[j] < cut and scores[edges[0,j]] < cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '-', c='r', alpha=preds[j])
+            if preds[j] > cut and labels[j] < cut and scores[edges[1,j]] < cut:
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '-', c='r', alpha=preds[j])
+
+            # True positives that doublet identifyer would have incorrectly identified
+            if preds[j] > cut and labels[j] > cut and scores[edges[0,j]] < cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '-', c='k')
+            if preds[j] > cut and labels[j] > cut and scores[edges[1,j]] < cut:
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '-', c='k')
+
+    return fig, ax0
+
+def draw_triplets_xy_antiscore_cut(hits, edges, preds, labels, cut=0.5, figsize=(16, 16)):
+    xi, yi = hits[:,0] * np.cos(hits[:,1]), hits[:,0] * np.sin(hits[:,1])
+    xo, yo = hits[:,3] * np.cos(hits[:,4]), hits[:,3] * np.sin(hits[:,4])
+    scores = hits[:,6]
+    fig, ax0 = plt.subplots(figsize=figsize)
+    
+    tf_mul = tf_multiplicity(hits, edges, preds, labels, cut)
+#     Draw the hits
+    ax0.scatter(xi, yi, s=2, c='k')
+    ax0.scatter(xo, yo, s=2, c='k')
+    
+    w = 0
+    l = 0
+    # Draw the segments
+    for j in range(len(xi)):
+        # Gold standards that the doublet model would have incorrectly identified
+        if (tf_mul[j][0]>0 and tf_mul[j][1]==0 
+            and tf_mul[j][3]==0 and scores[j] < cut):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '-', c='k')
+            w += 1
+        # Gold standards with missed tracks that the doublet model would have incorrectly identified
+        if (tf_mul[j][0]>0 and tf_mul[j][1]==0 
+            and tf_mul[j][3]>0 and scores[j] < cut):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '--', c='k')
+            w += 1
+            
+        # Silver standard positives that the doublet model would have incorrectly identified
+        if (tf_mul[j][0]>0 and tf_mul[j][1]>0 and scores[j] < cut):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '-.', c='k')
+            w += 1
+        
+        # Totally missed edges that the doublet model would have correctly identified
+        if (tf_mul[j][0]==0 and tf_mul[j][1]==0 and 
+            tf_mul[j][3]>0 and scores[j] > cut):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '--', c='r')
+            l += 1
+            
+        # Totally incorrect edges that the doublet model would have correctly identified
+        if (tf_mul[j][0]==0 and tf_mul[j][1]>0 and
+           scores[j] < cut):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '-', c='r')
+            l += 1
+        
+        # True negatives that the doublet model would have incorrectly identified
+        if (tf_mul[j][0]==0 and tf_mul[j][1]==0 and 
+           tf_mul[j][2] > 0 and tf_mul[j][3]==0 and scores[j] > cut):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     ':', c='k')
+            w += 1
+    print("Overperforms by: ", w, ", underperforms by: ", l, ".")
+    return fig, ax0
+
+def draw_triplets_xy_score(hits, edges, preds, labels, doublet=None, cut=0.5, figsize=(16, 16)):
+    xi, yi = [hits[:,0] * np.cos(hits[:,1]), hits[:,0] * np.sin(hits[:,1])]
+    xo, yo = [hits[:,3] * np.cos(hits[:,4]), hits[:,3] * np.sin(hits[:,4])]
+    scores = hits[:,6]
+    fig, ax0 = plt.subplots(figsize=figsize)
+
+#     Draw the hits
+    ax0.scatter(xi, yi, s=2, c='k')
+
+    # Draw the segments
+    #for j in range(labels.shape[0]):
+    if doublet is None:
+        for j in range(len(labels)):
+
+            # False negatives
+            if preds[j] < cut and labels[j] > cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '--', c='b', alpha=(scores[edges[0,j]]))
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '--', c='b', alpha=(scores[edges[1,j]]))
+
+            # False positives
+            if preds[j] > cut and labels[j] < cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '-', c='r', alpha=preds[j])
+            if preds[j] > cut and labels[j] < cut:
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '-', c='r', alpha=preds[j])
+
+            # True positives
+            if preds[j] > cut and labels[j] > cut:
+                ax0.plot([xi[edges[0,j]], xo[edges[0,j]]],
+                         [yi[edges[0,j]], yo[edges[0,j]]],
+                         '-', c='k', alpha=(scores[edges[0,j]]))
+            if preds[j] > cut and labels[j] > cut:
+                ax0.plot([xi[edges[1,j]], xo[edges[1,j]]],
+                         [yi[edges[1,j]], yo[edges[1,j]]],
+                         '-', c='k', alpha=(scores[edges[1,j]]))
+
+    return fig, ax0
+
+def add_multiplicity(hits, edges, preds, cut=0.5):
+    mul = np.zeros(len(hits))
+    w_mul = np.zeros(len(hits))
+    for edge, pred in zip(edges.T, preds) :
+        if pred > cut: 
+            mul[edge[0]] += 1
+            mul[edge[1]] += 1
+            w_mul[edge[0]] += pred**2
+            w_mul[edge[1]] += pred**2
+#     return np.concatenate([hits, np.array([mul]).T], axis=1)
+    return mul, w_mul
+
+def draw_triplets_mul_xy(hits, edges, preds, labels, cut=0.5, figsize=(16, 16)):
+    xi, yi = hits[:,0] * np.cos(hits[:,1]), hits[:,0] * np.sin(hits[:,1])
+    xo, yo = hits[:,3] * np.cos(hits[:,4]), hits[:,3] * np.sin(hits[:,4])
+    scores = hits[:,6]
+    fig, ax0 = plt.subplots(figsize=figsize)
+    cmap = plt.cm.seismic
+    mul, w_mul = add_multiplicity(hits, edges, preds, cut)
+#     Draw the hits
+    ax0.scatter(xi, yi, s=2, c='k')
+    ax0.scatter(xo, yo, s=2, c='k')
+
+    # Draw the segments
+    #for j in range(labels.shape[0]):
+    for j in range(len(xi)):
+        if (mul[j] == 1 or mul[j] == 2):
+#             if (w_mul[j]/mul[j]) > cut:
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]], color=cmap(1-scores[j]))
+
+
+    sm = plt.cm.ScalarMappable(cmap=cmap)
+    sm.set_array([])  # only needed for matplotlib < 3.1
+    fig.colorbar(sm)
+    return fig, ax0
+
+def tf_multiplicity(hits, edges, preds, labels, cut=0.5):
+    """Include true/false (t/f) positive/negative (p/n) as {tp,fp,tn,fn}"""
+    tf_mul = np.zeros((len(hits),4))
+    for edge, pred, label in zip(edges.T, preds, labels) :
+        # True positives
+        tf_mul[edge[0]][0] += int((pred > cut) and (label > cut))
+        tf_mul[edge[1]][0] += int((pred > cut) and (label > cut))
+        # False positives
+        tf_mul[edge[0]][1] += int((pred > cut) and (label < cut))
+        tf_mul[edge[1]][1] += int((pred > cut) and (label < cut))
+        # True negatives
+        tf_mul[edge[0]][2] += int((pred < cut) and (label < cut))
+        tf_mul[edge[1]][2] += int((pred < cut) and (label < cut))
+        # False negatives
+        tf_mul[edge[0]][3] += int((pred < cut) and (label > cut))
+        tf_mul[edge[0]][3] += int((pred < cut) and (label > cut))
+        
+    return tf_mul
+
+def draw_triplets_tf_mul_xy(hits, edges, preds, labels, cut=0.5, figsize=(16, 16), lineWidth = 2 ):
+    xi, yi = hits[:,0] * np.cos(hits[:,1]), hits[:,0] * np.sin(hits[:,1])
+    xo, yo = hits[:,3] * np.cos(hits[:,4]), hits[:,3] * np.sin(hits[:,4])
+    scores = hits[:,6]
+    fig, ax0 = plt.subplots(figsize=figsize)
+    
+    tf_mul = tf_multiplicity(hits, edges, preds, labels, cut)
+#     Draw the hits
+    ax0.scatter(xi, yi, s=2, c='k')
+    ax0.scatter(xo, yo, s=2, c='k')
+    
+    # Draw the segments
+    for j in range(len(xi)):
+        # Gold standard positives
+        if (tf_mul[j][0]>0 and tf_mul[j][1]==0 
+            and tf_mul[j][3]==0):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '-', c='#ffc70f', lineWidth= lineWidth)
+        # Gold standards with missed tracks
+        if (tf_mul[j][0]>0 and tf_mul[j][1]==0 
+            and tf_mul[j][3]>0):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '--', c='#982e06')
+            
+        # Silver standard positives
+        if (tf_mul[j][0]>0 and tf_mul[j][1]>0):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '-', c='#adadad')
+        
+        # Totally missed edges
+        if (tf_mul[j][0]==0 and tf_mul[j][1]==0 and 
+            tf_mul[j][3]>0):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '--', c='b')
+            
+        # Totally incorrect edges
+        if (tf_mul[j][0]==0 and tf_mul[j][1]>0):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     '-', c='r')
+        
+        # Weird things??
+        if (tf_mul[j][0]==0 and tf_mul[j][1]>0 and 
+           tf_mul[j][3] > 0):
+            ax0.plot([xi[j],xo[j]],[yi[j],yo[j]],
+                     ':', c='g')
     return fig, ax0

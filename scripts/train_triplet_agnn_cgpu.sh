@@ -11,7 +11,7 @@
 #SBATCH -A m1759
 
 # Setup
-config=configs/tripgnn_med.yaml
+config=configs/tripgnn_high.yaml
 mkdir -p logs
 . scripts/setup_cgpu.sh
 

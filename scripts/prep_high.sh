@@ -15,7 +15,7 @@ echo $SLURM_JOB_NUM_NODES
 i=0
 while [ $i -lt $SLURM_JOB_NUM_NODES ]; do
     echo "Launching task $i"
-    srun -N 1 python prepareDoublets.py \
+    srun -N 1 python prepareDoubletsEta.py \
         --n-workers 32 --task $i --n-tasks $SLURM_JOB_NUM_NODES $config &
     let i=i+1
 done

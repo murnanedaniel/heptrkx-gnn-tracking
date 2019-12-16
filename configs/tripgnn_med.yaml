@@ -1,13 +1,13 @@
-output_dir: /global/cscratch1/sd/danieltm/ExaTrkX/triplet_results/checkpoints_med/agnn02
+output_dir: /global/cscratch1/sd/danieltm/ExaTrkX/triplet_results/checkpoints_med_000/agnn05
 
 trainer:
     name: gnn_sparse
 
 data:
     name: hitgraphs_sparse
-    input_dir: /global/cscratch1/sd/danieltm/ExaTrkX/triplet_data/hitgraphs_med
-    n_train: 1920 #57344
-    n_valid: 80
+    input_dir: /global/cscratch1/sd/danieltm/ExaTrkX/triplet_data/hitgraphs_med_000
+    n_train: 3584 #57344
+    n_valid: 16
     real_weight: 3. #6.25  # 0.5 / 0.08
     batch_size: 4
     n_workers: 4
@@ -23,14 +23,14 @@ model:
 optimizer:
     name: Adam #SGD
     #momentum: 0.9
-    learning_rate: 0.01
+    learning_rate: 0.001
     lr_scaling: sqrt
     lr_warmup_epochs: 5
     lr_decay_schedule:
-        - {start_epoch: 10, end_epoch: 25, factor: 0.5}
-        - {start_epoch: 25, end_epoch: 40, factor: 0.01}
-        - {start_epoch: 40, end_epoch: 50, factor: 0.005}
-        - {start_epoch: 50, end_epoch: 64, factor: 0.001}
+        - {start_epoch: 10, end_epoch: 20, factor: 0.5}
+        - {start_epoch: 20, end_epoch: 40, factor: 0.1}
+        - {start_epoch: 40, end_epoch: 50, factor: 0.05}
+        - {start_epoch: 50, end_epoch: 64, factor: 0.01}
 
 training:
     n_epochs: 64

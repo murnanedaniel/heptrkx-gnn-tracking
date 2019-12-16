@@ -1,6 +1,6 @@
 # Input/output configuration
 input_dir:  /global/cscratch1/sd/danieltm/ExaTrkX/trackml/train_all
-output_dir:  /global/cscratch1/sd/danieltm/ExaTrkX/doublet_results/hitgraphs_med_000
+output_dir:  /global/cscratch1/sd/danieltm/ExaTrkX/doublet_data/hitgraphs_med_002
 n_files: 1000
 
 # Graph building configuration

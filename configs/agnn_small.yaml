@@ -1,15 +1,15 @@
-output_dir: /global/cscratch1/sd/danieltm/ExaTrkX/doublet_results/checkpoints_high/agnn002
+output_dir: /global/cscratch1/sd/danieltm/ExaTrkX/doublet_results/agnn08
 
 trainer:
     name: gnn_sparse
 
 data:
     name: hitgraphs_sparse
-    input_dir: /global/cscratch1/sd/danieltm/ExaTrkX/doublet_data/hitgraphs_high_001
-    n_train: 32768
-    n_valid: 4096
-    real_weight: 3. #5.0   # 0.5 / 0.1
-    batch_size: 4
+    input_dir: /global/cscratch1/sd/danieltm/ExaTrkX/doublet_data/hitgraphs_med_000
+    n_train: 100 #57344
+    n_valid: 16
+    real_weight: 3. #6.25  # 0.5 / 0.08
+    batch_size: 1
     n_workers: 4
 
 model:

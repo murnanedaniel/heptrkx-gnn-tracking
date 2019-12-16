@@ -1,0 +1,9 @@
+# Input/output configuration
+input_dir: /global/cscratch1/sd/danieltm/ExaTrkX/doublet_data/hitgraphs_high_000
+output_dir: /global/cscratch1/sd/danieltm/ExaTrkX/triplet_data/hitgraphs_high_000
+
+# Doublet trainer model
+doublet_model_dir: /global/cscratch1/sd/danieltm/ExaTrkX/doublet_results/checkpoints_high/agnn001
+
+# Graph building configuration
+include_scores: True

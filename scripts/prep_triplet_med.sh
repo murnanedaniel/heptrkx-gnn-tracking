@@ -7,7 +7,7 @@
 
 mkdir -p logs
 . scripts/setup_cori.sh
-config=configs/prep_tripgnn.yaml
+config=configs/prep_tripgnn_med.yaml
 
 echo $SLURM_JOB_NUM_NODES
 

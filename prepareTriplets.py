@@ -18,22 +18,18 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch_scatter import scatter_add
-import trackml.dataset
 
 # Locals
 from datasets.graph import Graph, save_graph
 from datasets import get_data_loaders
 from trainers import get_trainer
-from datasets.graph import Graph, save_graphs, save_graph
-from notebooks.nb_utils import (load_config_file, load_config_dir, load_summaries,
-                      plot_train_history, get_test_data_loader,
-                      compute_metrics, plot_metrics, draw_sample_xy)
+from utils.data_utils import load_config_dir, load_summaries, get_data_loader
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser('prepare.py')
+    parser = argparse.ArgumentParser('prepareTriplets.py')
     add_arg = parser.add_argument
-    add_arg('config', nargs='?', default='configs/prepare_trackml.yaml')
+    add_arg('config', nargs='?', default='configs/prep_tripgnn.yaml')
     add_arg('--n-workers', type=int, default=1)
     add_arg('--task', type=int, default=0)
     add_arg('--n-tasks', type=int, default=1)
@@ -43,9 +39,6 @@ def parse_args():
     return parser.parse_args()
 
 
-"""
-Possibly some pruning scripts
-"""
 
 """ OVERALL STRUCTURE
 Doublet preparation script makes graphs of (X, Ri, Ro, y, pid) -> Doublet trainer loads graphs with (X, edge_index, y)
@@ -55,7 +48,8 @@ Doublet preparation script makes graphs of (X, Ri, Ro, y, pid) -> Doublet traine
 
 
 def select_hits():
-    """ Future-proofing: May select triplets based on angle between doublets"""
+    """ Future-proofing: May select triplets based on angle between doublets
+    OR FROM A SCORE CUT """
     pass
 
 def load_pid(filename):
@@ -75,7 +69,7 @@ def load_doublet_data():
 
     return doublet_data, pid_data
 
-def get_edge_scores(result_dir, n_graphs):
+def get_edge_scores(result_dir, n_tasks, task):
     """
     - Takes config info for triplet training dataset (different from doublet training dataset),
     - Runs the dataset through the trained doublet network,
@@ -105,12 +99,12 @@ def get_edge_scores(result_dir, n_graphs):
 
     # Load the test dataset
 
-    test_loader = get_test_data_loader(config, n_test=n_graphs)
+    test_loader, indices = get_data_loader(config, n_tasks, task)
     # Apply the model
     test_preds, test_targets = trainer.predict(test_loader)
     doublet_data = test_loader.dataset
 
-    return test_preds, doublet_data
+    return test_preds, doublet_data, indices
 
 
 def edge_to_triplet(start, end, n_edges, n_hits):
@@ -126,7 +120,7 @@ def edge_to_triplet(start, end, n_edges, n_hits):
     E = [np.stack(np.meshgrid(j, i),-1).reshape(-1,2) for i,j in zip(Riwhere, Rowhere)]
     return np.concatenate(E).T
 
-def construct_triplet_graph(x,e,pid,o):
+def construct_triplet_graph(x, e, pid, o, include_scores):
     """
     Very similar to doublet graph builder. May take some pruning parameters.
     Takes output from doublet network.
@@ -142,11 +136,14 @@ def construct_triplet_graph(x,e,pid,o):
     n_triplets = triplet_index.shape[1]
 
     # Concatenate features by edge index
-    triplet_X = np.concatenate([x[e[0]],x[e[1]],np.array([o]).T], axis=1)
-
+    if include_scores:
+        triplet_X = np.concatenate([x[e[0]],x[e[1]],np.array([o]).T], axis=1)
+    else:
+        triplet_X = np.concatenate([x[e[0]],x[e[1]]], axis=1)
+        
     # Ground truth vector from THREE matching pids in the triplet edge
-    triplet_y = np.zeros(n_triplets)
-    triplet_y[:] = int((pid[triplet_index[0]] == pid[triplet_index[1]]) and (pid[triplet_index[0]] != 0))
+    triplet_y = np.zeros(n_triplets, dtype=np.float32)
+    triplet_y[:] = (pid[triplet_index[0]] == pid[triplet_index[1]]) * (pid[triplet_index[0]] != 0)
 
     # Convert the triplet_index matrix back to association matrices
     # NOTE: This is an inefficient process, since this is converted back later...
@@ -160,7 +157,7 @@ def construct_triplet_graph(x,e,pid,o):
     # return SparseGraph(X, edge_index, y)
 
 
-def process_event(data_row, output_dir):
+def process_event(data_row, output_dir, include_scores):
     """ Handles all events, returns nothing. As in doublet case"""
 
     # doublet_data, pid_data = load_doublet_data()
@@ -172,7 +169,7 @@ def process_event(data_row, output_dir):
 
     x, e, pid, o, filename = data_row
 
-    graph = construct_triplet_graph(x, e, pid, o)
+    graph = construct_triplet_graph(x, e, pid, o, include_scores)
 
     logging.info("Constructing graph " + str(filename))
 
@@ -185,19 +182,25 @@ def process_event(data_row, output_dir):
 #     save_graphs(graphs_all, filenames)
 
 
-def process_data(output_dir, result_dir, n_files, n_workers):
+def process_data(output_dir, result_dir, args, include_scores=True):
 
     logging.info("Processing result data")
 
-    edge_scores, doublet_data = get_edge_scores(result_dir, n_files)
+    # Calculate edge scores from best doublet model checkpoint
+    edge_scores, doublet_data, indices = get_edge_scores(result_dir, args.n_tasks, args.task)
     all_data = np.array([[gi.x.numpy(), gi.edge_index.numpy(), gi.pid.numpy(), oi.numpy()]
                     for gi, oi in zip(doublet_data, edge_scores)])
-    all_data = np.c_[all_data, np.arange(len(all_data)).T]
+    
+    # Attach an ID number to each graph for saving
+    all_data = np.c_[all_data, indices.T]
     print(all_data.shape)
     logging.info("Data processed")
-
+    
+    # Process events with pool
+    n_workers = args.n_workers
+    
     with mp.Pool(processes=n_workers) as pool:
-        process_fn = partial(process_event, output_dir=output_dir)
+        process_fn = partial(process_event, output_dir=output_dir, include_scores=include_scores)
         pool.map(process_fn, all_data)
 
 
@@ -223,8 +226,9 @@ def main():
 
     result_dir = config['doublet_model_dir']
     output_dir = config['output_dir']
+    include_scores = config['include_scores']
 
-    process_data(output_dir, result_dir, config['n_graphs'], args.n_workers)
+    process_data(output_dir, result_dir, args, include_scores)
 
 #     process_events(output_dir, result_dir, config['n_graphs'], args.n_workers)
 
